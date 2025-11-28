@@ -57,8 +57,8 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ id, isLocal }) => {
 
     // simple ground plane at y=0
     let nextY = player.y + vel.current.vy * dt;
-    if (nextY <= 0.12) {
-      nextY = 0.12;
+    if (nextY <= 1.11) { //was 0.12
+      nextY = 1.11;
       vel.current.vy = 0;
       vel.current.grounded = true;
     } else {
