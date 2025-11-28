@@ -1,4 +1,3 @@
-import React from "react";
 import { WesWorldCanvas } from "./components/WesWorldCanvas";
 import { Hud } from "./components/Hud";
 
