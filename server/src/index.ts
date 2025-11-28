@@ -3,12 +3,10 @@ import http from "http";
 import { Server } from "socket.io";
 import path from "path";
 import cors from "cors";
-import { fileURLToPath } from "url";
 import type { PlayerState } from "./shared-types";
 
-// Proper __filename / __dirname replacement for ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Tell TypeScript about the Node globals; Node will provide them at runtime.
+declare const __dirname: string;
 
 const app = express();
 app.use(cors());
@@ -21,6 +19,7 @@ const io = new Server(server, {
   }
 });
 
+// Serve the built client from /client/dist
 const staticRoot = path.join(__dirname, "../../client/dist");
 app.use(express.static(staticRoot));
 app.get("*", (_req, res) => {
@@ -92,7 +91,7 @@ function pushWorldState() {
   io.emit("worldState", { players: Array.from(players.values()) });
 }
 
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 3000;
 server.listen(port, () => {
   console.log(`[wesworld] listening on :${port}`);
 });
