@@ -8,16 +8,26 @@
   <body>
     <div id="root"></div>
 
-    <!-- Test if ANY JavaScript runs before React -->
+    <!-- Minimal debug overlay -->
     <script>
       console.log('✅ Inline script executed');
 
-      // Create persistent debug overlay
+      // Create collapsible debug overlay
       const debugDiv = document.createElement('div');
       debugDiv.id = 'debug-overlay';
-      debugDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.9);color:lime;padding:10px;font-family:monospace;font-size:11px;z-index:99999;max-height:200px;overflow:auto;';
-      debugDiv.innerHTML = '<div>✅ Inline JS executed</div>';
+      debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:lime;padding:5px;font-family:monospace;font-size:9px;z-index:99999;max-height:30px;overflow:auto;display:none;';
+      debugDiv.innerHTML = '<div>✅ Debug Log</div>';
       document.body.appendChild(debugDiv);
+
+      // Toggle button
+      const toggleBtn = document.createElement('button');
+      toggleBtn.textContent = '🐛';
+      toggleBtn.style.cssText = 'position:fixed;bottom:10px;left:10px;width:30px;height:30px;background:rgba(0,0,0,0.7);color:lime;border:1px solid lime;border-radius:4px;font-size:16px;z-index:99999;cursor:pointer;';
+      toggleBtn.onclick = () => {
+        debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+        debugDiv.style.maxHeight = debugDiv.style.display === 'none' ? '30px' : '150px';
+      };
+      document.body.appendChild(toggleBtn);
 
       function log(msg, color = 'lime') {
         const line = document.createElement('div');
@@ -27,20 +37,12 @@
         console.log(msg);
       }
 
-      // Flash yellow indicator
-      const flash = document.createElement('div');
-      flash.textContent = 'JS LOADED';
-      flash.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:yellow;color:black;padding:20px;font-size:24px;font-weight:bold;z-index:99998;border:3px solid black;';
-      document.body.appendChild(flash);
-      setTimeout(() => flash.remove(), 3000);
-
-      // Listen for module load
+      // Listen for errors
       window.addEventListener('error', (e) => {
         log('❌ ERROR: ' + e.message, 'red');
-        log('File: ' + e.filename, 'orange');
+        debugDiv.style.display = 'block';
       });
 
-      // Track if React loads
       window.reactLoaded = false;
       window.logDebug = log;
     </script>
