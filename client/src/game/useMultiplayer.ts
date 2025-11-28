@@ -10,8 +10,9 @@ export const useMultiplayer = () => {
 
   useEffect(() => {
     if (!socket) {
-      socket = io("/", {
-        path: "/ws"
+      socket = io({
+        path: "/ws",
+        transports: ["websocket"],
       });
     }
 
@@ -36,6 +37,9 @@ export const useMultiplayer = () => {
       socket.off("connect");
       socket.off("worldState");
       socket.off("patchSelf");
+      // optional:
+      // socket.disconnect();
+      // socket = null;
     };
   }, [setMyId, bulkSetPlayers, setPlayerPartial]);
 };
