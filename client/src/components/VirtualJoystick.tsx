@@ -1,12 +1,14 @@
 import React, { useRef, useState } from "react";
-import { useMovementFromJoystick } from "../game/useMovementFromJoystick";
+import { useJoystickSetter } from "../game/useMovementFromJoystick";
 
 const RADIUS = 48;
 
 export const VirtualJoystick: React.FC = () => {
   const ref = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(false);
-  const { setJoystickVector } = useMovementFromJoystick();
+
+  // Use the *setter-only* hook so we don't override the consumer
+  const { setJoystickVector } = useJoystickSetter();
 
   const handlePointerDown = (e: React.PointerEvent) => {
     setActive(true);
