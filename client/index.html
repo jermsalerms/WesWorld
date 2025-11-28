@@ -7,6 +7,17 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Test if ANY JavaScript runs before React -->
+    <script>
+      console.log('✅ Inline script executed');
+      const testDiv = document.createElement('div');
+      testDiv.textContent = 'JS LOADED';
+      testDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:yellow;color:black;padding:20px;font-size:24px;font-weight:bold;z-index:99999;border:3px solid black;';
+      document.body.appendChild(testDiv);
+      setTimeout(() => testDiv.remove(), 3000);
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
