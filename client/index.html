@@ -8,21 +8,19 @@
   <body>
     <div id="root"></div>
 
-    <!-- Minimal debug overlay -->
+    <!-- Debug infrastructure (configurable via config.ts) -->
     <script>
-      console.log('✅ Inline script executed');
-
-      // Create collapsible debug overlay
+      // Debug overlay - only shown if DEBUG_MODE is enabled
       const debugDiv = document.createElement('div');
       debugDiv.id = 'debug-overlay';
       debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:lime;padding:5px;font-family:monospace;font-size:9px;z-index:99999;max-height:30px;overflow:auto;display:none;';
-      debugDiv.innerHTML = '<div>✅ Debug Log</div>';
+      debugDiv.innerHTML = '<div>🐛 Debug Log (Enable DEBUG_MODE in config.ts)</div>';
       document.body.appendChild(debugDiv);
 
-      // Toggle button
+      // Toggle button for debug overlay
       const toggleBtn = document.createElement('button');
       toggleBtn.textContent = '🐛';
-      toggleBtn.style.cssText = 'position:fixed;bottom:10px;left:10px;width:30px;height:30px;background:rgba(0,0,0,0.7);color:lime;border:1px solid lime;border-radius:4px;font-size:16px;z-index:99999;cursor:pointer;';
+      toggleBtn.style.cssText = 'position:fixed;bottom:10px;left:10px;width:30px;height:30px;background:rgba(0,0,0,0.7);color:lime;border:1px solid lime;border-radius:4px;font-size:16px;z-index:99999;cursor:pointer;display:none;';
       toggleBtn.onclick = () => {
         debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
         debugDiv.style.maxHeight = debugDiv.style.display === 'none' ? '30px' : '150px';
@@ -37,18 +35,20 @@
         console.log(msg);
       }
 
-      // Listen for errors
+      // Always listen for errors, auto-show debug overlay on error
       window.addEventListener('error', (e) => {
         log('❌ ERROR: ' + e.message, 'red');
+        log('File: ' + (e.filename || 'unknown'), 'orange');
         debugDiv.style.display = 'block';
+        toggleBtn.style.display = 'block';
       });
 
       window.reactLoaded = false;
       window.logDebug = log;
-    </script>
-
-    <script type="module">
-      window.logDebug('✅ ES6 module loaded', 'cyan');
+      window.showDebugOverlay = () => {
+        debugDiv.style.display = 'block';
+        toggleBtn.style.display = 'block';
+      };
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
