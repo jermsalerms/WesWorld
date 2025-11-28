@@ -36,7 +36,7 @@ io.on("connection", (socket) => {
     id,
     name: "Wes",
     x: Math.random() * 4 - 2,
-    y: 0.12,
+    y: 1.11,
     z: Math.random() * 4 - 2,
     rotY: 0,
     form: "CADET",
