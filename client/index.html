@@ -11,11 +11,42 @@
     <!-- Test if ANY JavaScript runs before React -->
     <script>
       console.log('✅ Inline script executed');
-      const testDiv = document.createElement('div');
-      testDiv.textContent = 'JS LOADED';
-      testDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:yellow;color:black;padding:20px;font-size:24px;font-weight:bold;z-index:99999;border:3px solid black;';
-      document.body.appendChild(testDiv);
-      setTimeout(() => testDiv.remove(), 3000);
+
+      // Create persistent debug overlay
+      const debugDiv = document.createElement('div');
+      debugDiv.id = 'debug-overlay';
+      debugDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.9);color:lime;padding:10px;font-family:monospace;font-size:11px;z-index:99999;max-height:200px;overflow:auto;';
+      debugDiv.innerHTML = '<div>✅ Inline JS executed</div>';
+      document.body.appendChild(debugDiv);
+
+      function log(msg, color = 'lime') {
+        const line = document.createElement('div');
+        line.textContent = msg;
+        line.style.color = color;
+        debugDiv.appendChild(line);
+        console.log(msg);
+      }
+
+      // Flash yellow indicator
+      const flash = document.createElement('div');
+      flash.textContent = 'JS LOADED';
+      flash.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:yellow;color:black;padding:20px;font-size:24px;font-weight:bold;z-index:99998;border:3px solid black;';
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 3000);
+
+      // Listen for module load
+      window.addEventListener('error', (e) => {
+        log('❌ ERROR: ' + e.message, 'red');
+        log('File: ' + e.filename, 'orange');
+      });
+
+      // Track if React loads
+      window.reactLoaded = false;
+      window.logDebug = log;
+    </script>
+
+    <script type="module">
+      window.logDebug('✅ ES6 module loaded', 'cyan');
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
