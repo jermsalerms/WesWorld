@@ -78,6 +78,20 @@ body,
   letter-spacing: 0.16em;
 }
 
+.avatar-debug-bubble {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    sans-serif;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+
 .hud-badge {
   padding: 2px 8px;
   border-radius: 999px;
