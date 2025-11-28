@@ -34,7 +34,7 @@ export const VirtualJoystick: React.FC = () => {
     const cy = rect.top + rect.height / 2;
     const dx = e.clientX - cx;
     const dy = e.clientY - cy;
-    const dist = Math.min(Math.sqrt(dx * dx + dy * dy), RADIUS);
+    const dist = Math.min(Math.hypot(dx, dy), RADIUS);
     const angle = Math.atan2(dy, dx);
     const nx = (dist / RADIUS) * Math.cos(angle);
     const ny = (dist / RADIUS) * Math.sin(angle);
