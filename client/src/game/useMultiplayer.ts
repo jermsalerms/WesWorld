@@ -14,8 +14,14 @@ export const useMultiplayer = () => {
     if (!socket) {
       socket = io("/", {
         path: "/ws",
-        transports: ["websocket"], // avoid long polling weirdness on Fly
-        withCredentials: false
+        transports: ["websocket", "polling"]
+      });
+
+      socket.on("connect_error", (err) => {
+        console.error("[wesworld] socket connect_error", err.message);
+      });
+      socket.on("error", (err) => {
+        console.error("[wesworld] socket error", err);
       });
     }
 
