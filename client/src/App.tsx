@@ -4,6 +4,8 @@ import { Hud } from "./components/Hud";
 import "./styles.css";
 
 export function App() {
+  console.log("🎮 App component rendering...");
+
   useEffect(() => {
     console.log("[wesworld] React App mounted");
   }, []);
