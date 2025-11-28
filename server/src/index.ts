@@ -4,15 +4,11 @@ import { Server } from "socket.io";
 import path from "path";
 import cors from "cors";
 import { fileURLToPath } from "url";
-import type { PlayerState } from "../../shared-types";
+import type { PlayerState } from "./shared-types";
 
-// Workaround for __dirname with TypeScript/ESM transpilation
-const __filename = __filenameShim();
+// Proper __filename / __dirname replacement for ESM
+const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-function __filenameShim() {
-  return (process as any).mainModule?.filename ?? __filename;
-}
 
 const app = express();
 app.use(cors());
