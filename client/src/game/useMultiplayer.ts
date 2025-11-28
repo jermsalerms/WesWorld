@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 import { useMultiplayerStore } from "./multiplayerStore";
-import type { PlayerState } from "../../../shared-types";
+// shared-types now lives in server/src/shared-types.ts
+import type { PlayerState } from "../../../server/src/shared-types";
 
 let socket: Socket | null = null;
 
@@ -9,37 +10,37 @@ export const useMultiplayer = () => {
   const { setMyId, bulkSetPlayers, setPlayerPartial } = useMultiplayerStore();
 
   useEffect(() => {
+    // create a singleton socket connection
     if (!socket) {
-      socket = io({
+      socket = io("/", {
         path: "/ws",
-        transports: ["websocket"],
+        transports: ["websocket"], // avoid long polling weirdness on Fly
+        withCredentials: false
       });
     }
 
-    socket.on("connect", () => {
-      const id = socket!.id!;
+    const s = socket;
+
+    s.on("connect", () => {
+      const id = s.id!;
       setMyId(id);
-      socket!.emit("join", { name: "Wes" });
+      s.emit("join", { name: "Wes" });
     });
 
-    socket.on("worldState", (payload: { players: PlayerState[] }) => {
+    s.on("worldState", (payload: { players: PlayerState[] }) => {
       bulkSetPlayers(payload.players);
     });
 
-    socket.on("patchSelf", (partial: Partial<PlayerState>) => {
-      if (!socket) return;
-      const id = socket.id!;
+    s.on("patchSelf", (partial: Partial<PlayerState>) => {
+      if (!s.id) return;
+      const id = s.id;
       setPlayerPartial(id, partial);
     });
 
     return () => {
-      if (!socket) return;
-      socket.off("connect");
-      socket.off("worldState");
-      socket.off("patchSelf");
-      // optional:
-      // socket.disconnect();
-      // socket = null;
+      s.off("connect");
+      s.off("worldState");
+      s.off("patchSelf");
     };
   }, [setMyId, bulkSetPlayers, setPlayerPartial]);
 };
