@@ -1,8 +1,10 @@
 import React, { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import { useMultiplayerStore } from "./multiplayerStore";
 import { useMovementVector } from "./useMovementVector";
 import { useMovementFromJoystick } from "./useMovementFromJoystick";
+import { config } from "../config";
 import type { WesForm } from "../../../server/src/shared-types";
 
 interface PlayerAvatarProps {
@@ -80,16 +82,26 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ id, isLocal }) => {
         x: nextX,
         y: nextY,
         z: nextZ,
-        rotY
+        rotY,
+        inputX,
+        inputY
       });
     }
   });
 
   const color = suitColorForForm((player?.form ?? "CADET") as WesForm);
   const emissive = glowColorForForm((player?.form ?? "CADET") as WesForm);
-
+  
   return (
     <group ref={ref} position={[player?.x ?? 0, player?.y ?? 0.12, player?.z ?? 0]}>
+      {config.DEBUG_MODE && isLocal && player && (
+        <Html position={[0, 2.4, 0]} distanceFactor={12} center>
+          <div className="avatar-debug-bubble">
+            { (player.inputX ?? 0).toFixed(2) },{" "}
+            { (player.inputY ?? 0).toFixed(2) }
+          </div>
+        </Html>
+      )}
       <mesh castShadow receiveShadow>
         <capsuleGeometry args={[0.45, 1.1, 6, 16]} />
         <meshStandardMaterial
