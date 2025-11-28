@@ -10,4 +10,8 @@ export interface PlayerState {
   form: WesForm;
   world: "SKY_GARDEN" | "NEON_CITY" | "MUSHROOM_GROTTO" | "DEEP_CAVERN";
   lastUpdate: number;
+  
+  // Debug-only: current movement intent (combined keyboard/joystick)
+  inputX?: number;
+  inputY?: number;
 }
