@@ -7,7 +7,7 @@ export const config = {
    * Enable debug overlay and logging
    * Set to true for troubleshooting, false for production
    */
-  DEBUG_MODE: false,
+  DEBUG_MODE: true,
 
   /**
    * Show WebGL compatibility warning on mobile devices
