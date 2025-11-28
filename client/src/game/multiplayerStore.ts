@@ -1,4 +1,4 @@
-import create from "zustand";
+import { create } from "zustand";
 import type { PlayerState, WesForm } from "../../../server/src/shared-types";
 
 type WorldId = PlayerState["world"];
