@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMultiplayerStore } from "./multiplayerStore";
 import { useMovementVector } from "./useMovementVector";
 import { useMovementFromJoystick } from "./useMovementFromJoystick";
-import type { WesForm } from "../../../shared-types";
+import type { WesForm } from "../../../server/src/shared-types";
 
 interface PlayerAvatarProps {
   id: string;
