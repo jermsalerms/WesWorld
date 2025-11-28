@@ -1,12 +1,15 @@
 import React from "react";
 import { useMultiplayerStore } from "../game/multiplayerStore";
-import { useMovementVector } from "../game/useMovementVector";
+// import { useMovementVector } from "../game/useMovementVector";
 import { VirtualJoystick } from "./VirtualJoystick";
 
 export const Hud: React.FC = () => {
   const { myId, players, cycleWorld, cycleForm } = useMultiplayerStore();
   const me = myId ? players.get(myId) ?? null : null;
-  const movement = useMovementVector();
+  // remove use of useMovementVector(); and add inputX and inputY
+  // const movement = useMovementVector();
+  const inputX = me?.inputX ?? 0;
+  const inputY = me?.inputY ?? 0;
 
   const worldLabel = labelForWorld(me?.world ?? "SKY_GARDEN");
   const worldClass = badgeClassForWorld(me?.world ?? "SKY_GARDEN");
@@ -30,7 +33,7 @@ export const Hud: React.FC = () => {
           <div className="coords-row hud-mini-label">
             Input:{" "}
             <span className="coords-value">
-              {movement.x.toFixed(2)}, {movement.y.toFixed(2)}
+              {inputX.toFixed(2)}, {inputY.toFixed(2)}
             </span>
           </div>
         </div>
