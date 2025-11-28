@@ -6,6 +6,14 @@ import type { PlayerState } from "../../../server/src/shared-types";
 
 let socket: Socket | null = null;
 
+export const emitMove = (partial: Partial<PlayerState>) => {
+  if (!socket) {
+    console.warn("[wesworld] emitMove called before socket is ready");
+    return;
+  }
+  socket.emit("move", partial);
+};
+
 export const useMultiplayer = () => {
   const { setMyId, bulkSetPlayers, setPlayerPartial } = useMultiplayerStore();
 
