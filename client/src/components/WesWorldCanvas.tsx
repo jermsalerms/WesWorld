@@ -16,8 +16,7 @@ export const WesWorldCanvas: React.FC = () => {
 
   return (
     <div className="canvas-root">
-      <Canvas
-        camera={{ position: [0, 4.5, 10], fov: 55 }}
+      <Canvas camera={{ position: [0, 3, 8], fov: 55 }}>
         shadows
       >
         <Suspense fallback={null}>
