@@ -12,7 +12,8 @@ export const Ground: React.FC<GroundProps> = ({ world }) => {
   for (let x = -size; x <= size; x++) {
     for (let z = -size; z <= size; z++) {
       if ((x + z) % 2 === 0) {
-        tiles.push([x, 0, z]);
+  -     tiles.push([x, 0, z]);
+  +     tiles.push([x, -1, z]);
       }
     }
   }
