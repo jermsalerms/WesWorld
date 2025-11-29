@@ -73,11 +73,26 @@ useFrame((_state, dt) => {
   let nextZ = baseZ + vel.current.vz * dt;
 
   // --- 4. GROUND CLAMP ---
-  if (nextY <= 0.12) {
-    nextY = 0.12;
+  //
+  // Current Wes capsule is ~2 units tall (capsuleGeometry args={[0.45, 1.1, ...]})
+  // so the "radius" from center to bottom is ~1.0.
+  //
+  // The checkerboard tiles are positioned so their *top surface* is around y ≈ -1.5,
+  // so Wes' center should sit around y ≈ -0.5 when he's standing on them:
+  //
+  //   centerY (standing) ≈ tileTopY + radius ≈ -1.5 + 1.0 = -0.5
+  //
+  // We clamp his center to that value, so his feet rest right on the tiles.
+  const STAND_CENTER_Y = -0.5;
+
+  const nextY = pos.current.y + vel.current.vy * delta;
+
+  if (nextY <= STAND_CENTER_Y) {
+    pos.current.y = STAND_CENTER_Y;
     vel.current.vy = 0;
     vel.current.grounded = true;
   } else {
+    pos.current.y = nextY;
     vel.current.grounded = false;
   }
 
