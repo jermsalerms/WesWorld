@@ -1,6 +1,8 @@
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import { useThree, useFrame } from "@react-three/fiber";
+import { Vector3 } from "three";
 import { Ground } from "../game/Ground";
 import { PlayerAvatar } from "../game/PlayerAvatar";
 import { OtherPlayers } from "../game/OtherPlayers";
@@ -57,6 +59,7 @@ const SceneContents: React.FC<{ myId: string | null }> = ({ myId }) => {
       />
 
       <Ground world={world} />
+      <FollowCamera targetId={myId} />
 
       {myId && <PlayerAvatar id={myId} isLocal />}
       <OtherPlayers />
@@ -68,6 +71,27 @@ const SceneContents: React.FC<{ myId: string | null }> = ({ myId }) => {
       />
     </>
   );
+};
+
+const FollowCamera: React.FC<{ targetId: string | null }> = ({ targetId }) => {
+  const { camera } = useThree();
+  const player = useMultiplayerStore((s) =>
+    targetId ? s.players.get(targetId) ?? null : null
+  );
+
+  const offset = new Vector3(0, 4.5, 10); // behind & above Wes
+
+  useFrame(() => {
+    if (!player) return;
+
+    const targetPos = new Vector3(player.x, player.y, player.z);
+    const desired = targetPos.clone().add(offset);
+
+    camera.position.lerp(desired, 0.12);
+    camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
+  });
+
+  return null;
 };
 
 function backgroundColorForWorld(world: string): [string] {
