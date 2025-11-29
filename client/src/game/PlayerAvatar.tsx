@@ -71,7 +71,7 @@ useFrame((_state, dt) => {
   let nextX = baseX + vel.current.vx * dt;
   let nextY = baseY + vel.current.vy * dt;
   let nextZ = baseZ + vel.current.vz * dt;
-
+  
   // --- 4. GROUND CLAMP ---
   //
   // Current Wes capsule is ~2 units tall (capsuleGeometry args={[0.45, 1.1, ...]})
@@ -84,9 +84,9 @@ useFrame((_state, dt) => {
   //
   // We clamp his center to that value, so his feet rest right on the tiles.
   const STAND_CENTER_Y = -0.5;
-
+  
   const nextY = pos.current.y + vel.current.vy * delta;
-
+  
   if (nextY <= STAND_CENTER_Y) {
     pos.current.y = STAND_CENTER_Y;
     vel.current.vy = 0;
@@ -95,7 +95,7 @@ useFrame((_state, dt) => {
     pos.current.y = nextY;
     vel.current.grounded = false;
   }
-
+  
   // --- 5. ROTATION TOWARD MOVEMENT DIRECTION ---
   let rotY = player.rotY ?? 0;
   if (intentMag > 0.01) {
