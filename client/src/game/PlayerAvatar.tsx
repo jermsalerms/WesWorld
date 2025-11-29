@@ -202,3 +202,4 @@ function backpackColorForForm(form: WesForm): string {
     default:
       return "#020617";
   }
+}
