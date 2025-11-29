@@ -35,23 +35,19 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       copy.set(state.id, state);
       return { players: copy };
     }),
-
-bulkSetPlayers: (list) =>
-  set((prev) => {
-    const map = new Map(prev.players);
-    const myId = prev.myId;
-
-    for (const p of list) {
-      // ✅ Do NOT overwrite the local player with the server snapshot
-      if (myId && p.id === myId) {
-        continue;
+  
+  bulkSetPlayers: (list) =>
+    set((prev) => {
+      const map = new Map(prev.players);
+      const myId = prev.myId;
+      
+      for (const p of list) {
+        if (myId && p.id === myId) continue; // don’t overwrite me
+        map.set(p.id, p);
       }
-      map.set(p.id, p);
-    }
-
-    return { players: map };
-  }),
-
+      
+      return { players: map };
+    }),
 
   setPlayerPartial: (id, partial) =>
     set((prev) => {
