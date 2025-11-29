@@ -1,220 +1,265 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
-import { emitMove } from "./useMultiplayer";
+import { Group } from "three";
+import type { PlayerState } from "../../../server/src/shared-types";
 import { useMultiplayerStore } from "./multiplayerStore";
-import { useMovementVector } from "./useMovementVector";
-import { useMovementFromJoystick } from "./useMovementFromJoystick";
-import { config } from "../config";
-import type { WesForm } from "../../../server/src/shared-types";
+import { emitMove } from "./useMultiplayer";
+import { GROUND_TILE_TOP_Y } from "./Ground";
 
-interface PlayerAvatarProps {
-  id: string;
-  isLocal?: boolean;
+// --- Movement / physics constants ---
+const SPEED = 4.0;
+const AIR_CONTROL = 0.5;
+const GRAVITY = -18.0;
+const MAX_FALL_SPEED = -20.0;
+
+// Capsule geometry (roughly matches your v6: [0.45, 1.1, 8, 16])
+// Radius center->bottom ≈ 1.0 so bottom sits exactly on ground at y = 0.
+const CAPSULE_RADIUS = 1.0;
+const STAND_CENTER_Y = GROUND_TILE_TOP_Y + CAPSULE_RADIUS;
+
+// --- Helpers ---
+function lerp(a: number, b: number, t: number): number {
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  return a + (b - a) * clamped;
 }
 
-const SPEED = 6;
-const JUMP_FORCE = 8;
-const GRAVITY = -18;
-const MAX_FALL_SPEED = -24;
-const AIR_CONTROL = 0.65;
+function lerpAngle(a: number, b: number, t: number): number {
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  let diff = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (diff < -Math.PI) diff += Math.PI * 2;
+  return a + diff * clamped;
+}
 
-export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ id, isLocal }) => {
-  const ref = useRef<any>();
-  const vel = useRef({ vx: 0, vy: 0, vz: 0, grounded: true });
-  const lastSentRef = useRef(0);
-  const lastSentPosRef = useRef<{ x: number; y: number; z: number; rotY: number } | null>(null);
-  const { setPlayerPartial } = useMultiplayerStore();
-  const keyboardVec = useMovementVector();
-  const joystick = useMovementFromJoystick();
-  const player = useMultiplayerStore((s) => s.players.get(id));
+type PlayerAvatarProps = {
+  id: string;
+  player: PlayerState;
+  isLocal: boolean;
+};
 
-useFrame((_state, dt) => {
-  if (!ref.current || !player) return;
+type PosState = { x: number; y: number; z: number };
+type VelState = {
+  vx: number;
+  vy: number;
+  vz: number;
+  grounded: boolean;
+  rotY: number;
+};
 
-  // --- 1. INPUT: keyboard + joystick merged ---
-  let inputX = keyboardVec.x;
-  let inputY = keyboardVec.y;
+export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
+  id,
+  player,
+  isLocal,
+}) => {
+  const groupRef = useRef<Group | null>(null);
 
-  if (Math.abs(joystick.x) > 0.1 || Math.abs(joystick.y) > 0.1) {
-    inputX = joystick.x;
-    inputY = joystick.y;
-  }
+  const setPlayerPartial = useMultiplayerStore((s) => s.setPlayerPartial);
 
-  const forward = -inputY;
-  const strafe = inputX;
+  // Local positional state used for interpolation / physics
+  const pos = useRef<PosState>({
+    x: player.x,
+    y: player.y || STAND_CENTER_Y,
+    z: player.z,
+  });
 
-  const intentMag = Math.min(1, Math.hypot(forward, strafe));
-  const accel = SPEED * (vel.current.grounded ? 1 : AIR_CONTROL);
+  const vel = useRef<VelState>({
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    grounded: true,
+    rotY: player.rotY ?? 0,
+  });
 
-  const targetVx = strafe * accel;
-  const targetVz = forward * accel;
+  // Simple keyboard input for local player (WASD / arrows)
+  const inputRef = useRef({ x: 0, y: 0 });
 
-  // --- 2. VELOCITY INTEGRATION ---
-  vel.current.vx = lerp(vel.current.vx, targetVx, 10 * dt);
-  vel.current.vz = lerp(vel.current.vz, targetVz, 10 * dt);
+  useEffect(() => {
+    if (!isLocal) return;
 
-  if (!vel.current.grounded) {
-    vel.current.vy = Math.max(
-      vel.current.vy + GRAVITY * dt,
-      MAX_FALL_SPEED
-    );
-  }
-
-  // --- 3. BASE POSITION ---
-  // Local player: trust the mesh (ref) as the starting point.
-  // Remote players: trust the store snapshot.
-  const baseX = isLocal ? ref.current.position.x : player.x;
-  const baseY = isLocal ? ref.current.position.y : player.y;
-  const baseZ = isLocal ? ref.current.position.z : player.z;
-
-  let nextX = baseX + vel.current.vx * dt;
-  let nextY = baseY + vel.current.vy * dt;
-  let nextZ = baseZ + vel.current.vz * dt;
-  
-  // --- 4. GROUND CLAMP ---
-  //
-  // Current Wes capsule is ~2 units tall (capsuleGeometry args={[0.45, 1.1, ...]})
-  // so the "radius" from center to bottom is ~1.0.
-  //
-  // The checkerboard tiles are positioned so their *top surface* is around y ≈ -1.5,
-  // so Wes' center should sit around y ≈ -0.5 when he's standing on them:
-  //
-  //   centerY (standing) ≈ tileTopY + radius ≈ -1.5 + 1.0 = -0.5
-  //
-  // We clamp his center to that value, so his feet rest right on the tiles.
-  const STAND_CENTER_Y = -0.5;
-  
-  const nextY = pos.current.y + vel.current.vy * delta;
-  
-  if (nextY <= STAND_CENTER_Y) {
-    pos.current.y = STAND_CENTER_Y;
-    vel.current.vy = 0;
-    vel.current.grounded = true;
-  } else {
-    pos.current.y = nextY;
-    vel.current.grounded = false;
-  }
-  
-  // --- 5. ROTATION TOWARD MOVEMENT DIRECTION ---
-  let rotY = player.rotY ?? 0;
-  if (intentMag > 0.01) {
-    const desiredAngle = Math.atan2(targetVx, targetVz);
-    vel.current.rotY = lerpAngle(vel.current.rotY ?? rotY, desiredAngle, 10 * dt);
-    rotY = vel.current.rotY!;
-  }
-
-  // --- 6. APPLY TO MESH ---
-  ref.current.position.set(nextX, nextY, nextZ);
-  ref.current.rotation.y = rotY;
-
-  // --- 7. LOCAL PLAYER: update store + tell server ---
-  if (isLocal) {
-    const partial = {
-      x: nextX,
-      y: nextY,
-      z: nextZ,
-      rotY,
-      inputX,
-      inputY
+    const handleKeyDown = (e: KeyboardEvent) => {
+      switch (e.code) {
+        case "KeyW":
+        case "ArrowUp":
+          inputRef.current.y = 1;
+          break;
+        case "KeyS":
+        case "ArrowDown":
+          inputRef.current.y = -1;
+          break;
+        case "KeyA":
+        case "ArrowLeft":
+          inputRef.current.x = -1;
+          break;
+        case "KeyD":
+        case "ArrowRight":
+          inputRef.current.x = 1;
+          break;
+      }
     };
 
-    setPlayerPartial(id, partial);
-    emitMove(partial);
-  }
-});
+    const handleKeyUp = (e: KeyboardEvent) => {
+      switch (e.code) {
+        case "KeyW":
+        case "ArrowUp":
+          if (inputRef.current.y === 1) inputRef.current.y = 0;
+          break;
+        case "KeyS":
+        case "ArrowDown":
+          if (inputRef.current.y === -1) inputRef.current.y = 0;
+          break;
+        case "KeyA":
+        case "ArrowLeft":
+          if (inputRef.current.x === -1) inputRef.current.x = 0;
+          break;
+        case "KeyD":
+        case "ArrowRight":
+          if (inputRef.current.x === 1) inputRef.current.x = 0;
+          break;
+      }
+    };
 
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [isLocal]);
 
-  const color = suitColorForForm((player?.form ?? "CADET") as WesForm);
-  const emissive = glowColorForForm((player?.form ?? "CADET") as WesForm);
-  
+  // When server state changes for remote players, snap our local pos toward it
+  useEffect(() => {
+    if (isLocal) return;
+    pos.current.x = player.x;
+    pos.current.y = player.y || STAND_CENTER_Y;
+    pos.current.z = player.z;
+    vel.current.rotY = player.rotY ?? vel.current.rotY;
+  }, [isLocal, player.x, player.y, player.z, player.rotY]);
+
+  useFrame((_state, delta) => {
+    if (!groupRef.current) return;
+
+    if (isLocal) {
+      // --- 1. INPUT ---
+      let inputX = inputRef.current.x;
+      let inputY = inputRef.current.y;
+
+      // Normalize
+      const mag = Math.hypot(inputX, inputY);
+      if (mag > 1e-3) {
+        inputX /= mag;
+        inputY /= mag;
+      }
+
+      // forward/back relative to camera's -Z, but here we assume simple world axes
+      const forward = inputY;
+      const strafe = inputX;
+
+      const intentMag = Math.min(1, Math.hypot(forward, strafe));
+      const accel = SPEED * (vel.current.grounded ? 1 : AIR_CONTROL);
+
+      const targetVx = strafe * accel;
+      const targetVz = forward * accel;
+
+      vel.current.vx = lerp(vel.current.vx, targetVx, 10 * delta);
+      vel.current.vz = lerp(vel.current.vz, targetVz, 10 * delta);
+
+      if (!vel.current.grounded) {
+        vel.current.vy = Math.max(
+          vel.current.vy + GRAVITY * delta,
+          MAX_FALL_SPEED
+        );
+      }
+
+      // --- 2. POSITION INTEGRATION ---
+      let nextX = pos.current.x + vel.current.vx * delta;
+      let nextY = pos.current.y + vel.current.vy * delta;
+      let nextZ = pos.current.z + vel.current.vz * delta;
+
+      // --- 3. GROUND CLAMP ---
+      if (nextY <= STAND_CENTER_Y) {
+        nextY = STAND_CENTER_Y;
+        vel.current.vy = 0;
+        vel.current.grounded = true;
+      } else {
+        vel.current.grounded = false;
+      }
+
+      pos.current.x = nextX;
+      pos.current.y = nextY;
+      pos.current.z = nextZ;
+
+      // --- 4. ROTATION ---
+      if (intentMag > 0.01) {
+        const desiredAngle = Math.atan2(targetVx, targetVz);
+        vel.current.rotY = lerpAngle(vel.current.rotY, desiredAngle, 10 * delta);
+      }
+
+      // --- 5. APPLY TO MESH ---
+      groupRef.current.position.set(
+        pos.current.x,
+        pos.current.y,
+        pos.current.z
+      );
+      groupRef.current.rotation.y = vel.current.rotY;
+
+      // --- 6. SYNC TO STORE + SERVER ---
+      const partial: Partial<PlayerState> = {
+        x: pos.current.x,
+        y: pos.current.y,
+        z: pos.current.z,
+        rotY: vel.current.rotY,
+        inputX,
+        inputY,
+      };
+
+      setPlayerPartial(id, partial);
+      emitMove(partial);
+    } else {
+      // Remote players: simple interpolation toward authoritative server state
+      const interpSpeed = 10 * delta;
+
+      pos.current.x = lerp(pos.current.x, player.x, interpSpeed);
+      pos.current.y = lerp(
+        pos.current.y,
+        player.y || STAND_CENTER_Y,
+        interpSpeed
+      );
+      pos.current.z = lerp(pos.current.z, player.z, interpSpeed);
+      vel.current.rotY = lerpAngle(
+        vel.current.rotY,
+        player.rotY ?? vel.current.rotY,
+        interpSpeed
+      );
+
+      groupRef.current.position.set(
+        pos.current.x,
+        pos.current.y,
+        pos.current.z
+      );
+      groupRef.current.rotation.y = vel.current.rotY;
+    }
+  });
+
+  // Simple color helper (can expand to per-player colors if you like)
+  const color = "#f97316";
+
   return (
-    <group ref={ref} position={[player?.x ?? 0, player?.y ?? 0.12, player?.z ?? 0]}>
-      {config.DEBUG_MODE && isLocal && player && (
-        <Html position={[0, 2.4, 0]} distanceFactor={12} center>
-          <div className="avatar-debug-bubble">
-            { (player.inputX ?? 0).toFixed(2) },{" "}
-            { (player.inputY ?? 0).toFixed(2) }
-          </div>
-        </Html>
-      )}
+    <group ref={groupRef} position={[pos.current.x, pos.current.y, pos.current.z]}>
+      {/* Body */}
       <mesh castShadow receiveShadow>
-        <capsuleGeometry args={[0.45, 1.1, 6, 16]} />
-        <meshStandardMaterial
-          color={color}
-          emissive={emissive}
-          emissiveIntensity={0.5}
-          metalness={0.4}
-          roughness={0.35}
-        />
+        <capsuleGeometry args={[0.45, 1.1, 8, 16]} />
+        <meshStandardMaterial color={color} />
       </mesh>
-      <mesh position={[0, 1.15, 0.26]}>
-        <boxGeometry args={[0.55, 0.65, 0.3]} />
-        <meshStandardMaterial
-          color={backpackColorForForm((player?.form ?? "CADET") as WesForm)}
-          emissive={emissive}
-          emissiveIntensity={0.65}
-          roughness={0.5}
-        />
-      </mesh>
-      <mesh position={[0, 0.85, 0.42]}>
-        <circleGeometry args={[0.14, 32]} />
-        <meshBasicMaterial color={emissive} />
+
+      {/* Head */}
+      <mesh
+        castShadow
+        position={[0, CAPSULE_RADIUS + 0.6, 0]} // a bit above top of capsule
+      >
+        <sphereGeometry args={[0.35, 16, 16]} />
+        <meshStandardMaterial color="#fde68a" />
       </mesh>
     </group>
   );
 };
 
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * Math.min(1, Math.max(0, t));
-}
-
-function lerpAngle(a: number, b: number, t: number) {
-  const diff = (((b - a) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-  return a + diff * Math.min(1, Math.max(0, t));
-}
-
-function suitColorForForm(form: WesForm): string {
-  switch (form) {
-    case "YOUNG":
-      return "#ef4444";
-    case "CADET":
-      return "#e5e7eb";
-    case "SHADOW":
-      return "#020617";
-    case "QUANTUM":
-      return "#1f2937";
-    default:
-      return "#e5e7eb";
-  }
-}
-
-function glowColorForForm(form: WesForm): string {
-  switch (form) {
-    case "YOUNG":
-      return "#38bdf8";
-    case "CADET":
-      return "#38bdf8";
-    case "SHADOW":
-      return "#a855f7";
-    case "QUANTUM":
-      return "#22c55e";
-    default:
-      return "#38bdf8";
-  }
-}
-
-function backpackColorForForm(form: WesForm): string {
-  switch (form) {
-    case "YOUNG":
-      return "#b45309";
-    case "CADET":
-      return "#020617";
-    case "SHADOW":
-      return "#020617";
-    case "QUANTUM":
-      return "#111827";
-    default:
-      return "#020617";
-  }
-}
+export default PlayerAvatar;
