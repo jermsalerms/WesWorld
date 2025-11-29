@@ -12,8 +12,8 @@ const AIR_CONTROL = 0.5;
 const GRAVITY = -18.0;
 const MAX_FALL_SPEED = -20.0;
 
-// Capsule geometry (roughly matches your v6: [0.45, 1.1, 8, 16])
-// Radius center->bottom ≈ 1.0 so bottom sits exactly on ground at y = 0.
+// Capsule: roughly 2 units tall (capsuleGeometry [0.45, 1.1, 8, 16])
+// Radius center->bottom ~1.0 so bottom sits at y = GROUND_TILE_TOP_Y
 const CAPSULE_RADIUS = 1.0;
 const STAND_CENTER_Y = GROUND_TILE_TOP_Y + CAPSULE_RADIUS;
 
@@ -32,8 +32,6 @@ function lerpAngle(a: number, b: number, t: number): number {
 
 type PlayerAvatarProps = {
   id: string;
-  player: PlayerState;
-  isLocal: boolean;
 };
 
 type PosState = { x: number; y: number; z: number };
@@ -45,20 +43,21 @@ type VelState = {
   rotY: number;
 };
 
-export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
-  id,
-  player,
-  isLocal,
-}) => {
-  const groupRef = useRef<Group | null>(null);
-
+export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ id }) => {
+  // Pull shared state from multiplayer store
+  const player = useMultiplayerStore((s) => s.players[id]);
+  const myId = useMultiplayerStore((s) => s.myId);
   const setPlayerPartial = useMultiplayerStore((s) => s.setPlayerPartial);
+
+  const isLocal = myId === id;
+
+  const groupRef = useRef<Group | null>(null);
 
   // Local positional state used for interpolation / physics
   const pos = useRef<PosState>({
-    x: player.x,
-    y: player.y || STAND_CENTER_Y,
-    z: player.z,
+    x: 0,
+    y: STAND_CENTER_Y,
+    z: 0,
   });
 
   const vel = useRef<VelState>({
@@ -66,11 +65,20 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
     vy: 0,
     vz: 0,
     grounded: true,
-    rotY: player.rotY ?? 0,
+    rotY: 0,
   });
 
   // Simple keyboard input for local player (WASD / arrows)
   const inputRef = useRef({ x: 0, y: 0 });
+
+  // Initialize from player once it exists
+  useEffect(() => {
+    if (!player) return;
+    pos.current.x = player.x;
+    pos.current.y = player.y ?? STAND_CENTER_Y;
+    pos.current.z = player.z;
+    vel.current.rotY = player.rotY ?? 0;
+  }, [player?.x, player?.y, player?.z, player?.rotY]);
 
   useEffect(() => {
     if (!isLocal) return;
@@ -125,17 +133,15 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
     };
   }, [isLocal]);
 
-  // When server state changes for remote players, snap our local pos toward it
-  useEffect(() => {
-    if (isLocal) return;
-    pos.current.x = player.x;
-    pos.current.y = player.y || STAND_CENTER_Y;
-    pos.current.z = player.z;
-    vel.current.rotY = player.rotY ?? vel.current.rotY;
-  }, [isLocal, player.x, player.y, player.z, player.rotY]);
-
   useFrame((_state, delta) => {
     if (!groupRef.current) return;
+
+    // If we don't have a server-side player yet, just keep the mesh where it is
+    if (!player) {
+      groupRef.current.position.set(pos.current.x, pos.current.y, pos.current.z);
+      groupRef.current.rotation.y = vel.current.rotY;
+      return;
+    }
 
     if (isLocal) {
       // --- 1. INPUT ---
@@ -149,7 +155,7 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
         inputY /= mag;
       }
 
-      // forward/back relative to camera's -Z, but here we assume simple world axes
+      // forward/back relative to world Z
       const forward = inputY;
       const strafe = inputX;
 
@@ -214,13 +220,13 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
       setPlayerPartial(id, partial);
       emitMove(partial);
     } else {
-      // Remote players: simple interpolation toward authoritative server state
+      // Remote players: interpolation toward authoritative server state
       const interpSpeed = 10 * delta;
 
       pos.current.x = lerp(pos.current.x, player.x, interpSpeed);
       pos.current.y = lerp(
         pos.current.y,
-        player.y || STAND_CENTER_Y,
+        player.y ?? STAND_CENTER_Y,
         interpSpeed
       );
       pos.current.z = lerp(pos.current.z, player.z, interpSpeed);
@@ -239,7 +245,11 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
     }
   });
 
-  // Simple color helper (can expand to per-player colors if you like)
+  // If we *still* don't have a player, don't render anything yet
+  if (!player) {
+    return null;
+  }
+
   const color = "#f97316";
 
   return (
@@ -253,7 +263,7 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
       {/* Head */}
       <mesh
         castShadow
-        position={[0, CAPSULE_RADIUS + 0.6, 0]} // a bit above top of capsule
+        position={[0, CAPSULE_RADIUS + 0.6, 0]}
       >
         <sphereGeometry args={[0.35, 16, 16]} />
         <meshStandardMaterial color="#fde68a" />
