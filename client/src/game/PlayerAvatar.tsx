@@ -61,12 +61,18 @@ useFrame((_state, dt) => {
     );
   }
 
-  // --- 3. POSITION + GROUND CLAMP ---
-  let nextX = (player.x ?? 0) + vel.current.vx * dt;
-  let nextY = (player.y ?? 0.12) + vel.current.vy * dt;
-  let nextZ = (player.z ?? 0) + vel.current.vz * dt;
+  // --- 3. BASE POSITION ---
+  // Local player: trust the mesh (ref) as the starting point.
+  // Remote players: trust the store snapshot.
+  const baseX = isLocal ? ref.current.position.x : player.x;
+  const baseY = isLocal ? ref.current.position.y : player.y;
+  const baseZ = isLocal ? ref.current.position.z : player.z;
 
-  // simple ground plane at y = 0.12 (you can later swap to 1.11 if you want)
+  let nextX = baseX + vel.current.vx * dt;
+  let nextY = baseY + vel.current.vy * dt;
+  let nextZ = baseZ + vel.current.vz * dt;
+
+  // --- 4. GROUND CLAMP ---
   if (nextY <= 0.12) {
     nextY = 0.12;
     vel.current.vy = 0;
@@ -75,19 +81,19 @@ useFrame((_state, dt) => {
     vel.current.grounded = false;
   }
 
-  // --- 4. ROTATION TOWARD MOVEMENT DIRECTION ---
+  // --- 5. ROTATION TOWARD MOVEMENT DIRECTION ---
   let rotY = player.rotY ?? 0;
   if (intentMag > 0.01) {
-    const desiredAngle = Math.atan2(targetVx, targetVz); // x,z → yaw
+    const desiredAngle = Math.atan2(targetVx, targetVz);
     vel.current.rotY = lerpAngle(vel.current.rotY ?? rotY, desiredAngle, 10 * dt);
     rotY = vel.current.rotY!;
   }
 
-  // --- 5. APPLY TO MESH ---
+  // --- 6. APPLY TO MESH ---
   ref.current.position.set(nextX, nextY, nextZ);
   ref.current.rotation.y = rotY;
 
-  // --- 6. LOCAL PLAYER: client prediction + server sync ---
+  // --- 7. LOCAL PLAYER: update store + tell server ---
   if (isLocal) {
     const partial = {
       x: nextX,
@@ -95,48 +101,11 @@ useFrame((_state, dt) => {
       z: nextZ,
       rotY,
       inputX,
-      inputY,
+      inputY
     };
 
-    // 6a. update local store immediately (prediction)
     setPlayerPartial(id, partial);
-
-    // 6b. throttled emit to server
-    const now = performance.now();
-    const lastSent = lastSentRef.current;
-    const lastPos = lastSentPosRef.current;
-
-    const POSITION_EPS = 0.01;
-    const ROT_EPS = 0.01;
-    const TIME_EPS_MS = 50; // ~20 updates/sec max
-
-    let movedEnough = true;
-    if (lastPos) {
-      const dx = partial.x - lastPos.x;
-      const dy = partial.y - lastPos.y;
-      const dz = partial.z - lastPos.z;
-      const dRot = partial.rotY - lastPos.rotY;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      movedEnough = dist > POSITION_EPS || Math.abs(dRot) > ROT_EPS;
-    }
-
-    if (!lastPos || (now - lastSent > TIME_EPS_MS && movedEnough)) {
-      emitMove(partial);
-      lastSentRef.current = now;
-      lastSentPosRef.current = {
-        x: partial.x,
-        y: partial.y,
-        z: partial.z,
-        rotY: partial.rotY,
-      };
-    }
-  } else {
-    // --- 7. REMOTE PLAYERS (just in case) ---
-    // For non-local avatars, we could trust server state only.
-    // But since we already used player.x/y/z above, you can leave this empty
-    // or explicitly mirror player if you prefer:
-    // ref.current.position.set(player.x, player.y, player.z);
-    // ref.current.rotation.y = player.rotY ?? 0;
+    emitMove(partial);
   }
 });
 
@@ -233,4 +202,3 @@ function backpackColorForForm(form: WesForm): string {
     default:
       return "#020617";
   }
-}
